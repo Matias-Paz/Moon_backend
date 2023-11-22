@@ -1,16 +1,21 @@
 import express from "express";
 import cors from "cors";
-import gamesRoutes from "./routes/games.routes.js";
-import indexRoutes from "./routes/index.routes.js";
+import gamesRoutes from "./games/games.routes.js";
+import { PORT } from "./config.js";
+// const PORT = 3000;
 
 const app = express();
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}: http://localhost:${PORT}`);
+});
 
 // Configurar el middleware CORS para permitir cualquier origen
 app.use(cors());
 
-app.use(express.json());
+app.disable("x-powered-by");
 
-app.use(indexRoutes);
+app.use(express.json());
 
 app.use("/api", gamesRoutes);
 

@@ -33,6 +33,7 @@ export const getGame = async (req, res) => {
       });
 
     const formattedRow = formatGames(rows[0]);
+
     res.json(formattedRow);
   } catch (error) {
     return res.status(500).json({
