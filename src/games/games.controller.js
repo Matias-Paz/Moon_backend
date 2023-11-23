@@ -1,5 +1,6 @@
 import { pool } from "../db.js";
 import { formatGames, generateUpdateFields } from "../utility/gameFunction.js";
+import { gamesValidation } from "./gamesValidation.js";
 
 export const getGames = async (req, res) => {
   try {
@@ -7,7 +8,7 @@ export const getGames = async (req, res) => {
       "SELECT g.id, g.img, g.offer, g.price, g.stock, g.title, g.rating, g.release_date, g.short_description, c1._name AS publisher, c2._name AS developer, GROUP_CONCAT(DISTINCT ge._name) AS genres FROM games g JOIN company c1 ON g.publishers_id = c1.company_id JOIN company c2 ON g.developers_id = c2.company_id LEFT JOIN games_genres gg ON g.id = gg.games_id LEFT JOIN genres ge ON gg.genres_id = ge.genres_id GROUP BY g.id;"
     );
 
-    const formattedRows = rows.map(row => {
+    const formattedRows = rows.map((row) => {
       return formatGames(row);
     });
 
@@ -44,57 +45,51 @@ export const getGame = async (req, res) => {
 
 export const createGame = async (req, res) => {
   try {
+    const uniqueGenres = [...new Set(req.body.genres)].slice(0, 3);
+
+    const usedGenres = new Set();
+    const resultValidation = gamesValidation({
+      title: String(req.body.title),
+      img_url: String(req.body.img_url),
+      offer: Number(req.body.offer),
+      price: Number(req.body.price),
+      stock: Number(req.body.stock),
+      rating: Number(req.body.rating),
+      developer: Number(req.body.developer),
+      publisher: Number(req.body.publisher),
+      release_date: new Date(req.body.release_date),
+      short_description: String(req.body.short_description),
+      genres: uniqueGenres.map((genre) => Number(genre)),
+    });
+
+    if (!resultValidation?.success) {
+      return res.status(422).json(resultValidation?.error);
+    }
+
     const {
-      img,
+      title,
+      img_url,
       offer,
       price,
       stock,
-      title,
       rating,
       developer,
       publisher,
       release_date,
       short_description,
-      genres, // Array de IDs de géneros
-    } = req.body;
-
-    // Verificar si alguna de las propiedades requeridas está vacía
-    if (
-      [
-        offer,
-        price,
-        stock,
-        title,
-        rating,
-        developer,
-        publisher,
-        release_date,
-        short_description,
-      ].some(value => value === "" || value === null) ||
-      (genres !== null && (genres.length === 0 || genres.length > 3))
-    ) {
-      return res.status(400).json({
-        message:
-          "Some required properties are missing or empty, or 'genres' array is empty or exceeds the limit of three genres when provided.",
-      });
-    }
-
-    const formattedReleaseDate = new Date(release_date);
-    const year = formattedReleaseDate.getFullYear();
-    const month = String(formattedReleaseDate.getMonth() + 1).padStart(2, "0");
-    const day = String(formattedReleaseDate.getDate()).padStart(2, "0");
-    const formattedDateString = `${year}-${month}-${day}`;
+      genres,
+    } = resultValidation.data;
 
     const [rows] = await pool.query(
       "INSERT INTO games (img, offer, price, stock, title, rating, release_date, short_description, publishers_id, developers_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
-        img,
+        title,
+        img_url,
         offer,
         price,
         stock,
-        title,
         rating,
-        formattedDateString,
+        release_date,
         short_description,
         publisher,
         developer,
@@ -103,12 +98,8 @@ export const createGame = async (req, res) => {
 
     const gameId = rows.insertId;
 
-    const uniqueGenres = [...new Set(genres)].slice(0, 3); // Limitar a tres géneros únicos
-
-    const usedGenres = new Set(); // Para rastrear IDs de géneros usados
-
     // Insertar géneros únicos en la tabla games_genres directamente desde el array de IDs
-    for (const genreId of uniqueGenres) {
+    for (const genreId of genres) {
       if (!usedGenres.has(genreId)) {
         await pool.query(
           "INSERT INTO games_genres (games_id, genres_id) VALUES (?, ?)",
@@ -124,7 +115,7 @@ export const createGame = async (req, res) => {
       [Array.from(usedGenres)]
     );
 
-    const genreNames = genresData.map(genre => genre._name);
+    const genreNames = genresData.map((genre) => genre._name);
 
     // Obtener los nombres del publisher y del developer
     const [namesData] = await pool.query(
@@ -134,17 +125,17 @@ export const createGame = async (req, res) => {
 
     res.send({
       id: gameId,
-      img,
+      title,
+      img_url,
       offer,
       price,
       stock,
-      title,
       rating,
-      release_date: formattedDateString,
+      publisher: namesData[0].publisher,
+      developer: namesData[0].developer,
+      release_date,
       short_description,
-      publisher: namesData[0].publisher, // Nombre del publisher
-      developer: namesData[0].developer, // Nombre del developer
-      genres: genreNames, // Devolver los nombres de los géneros seleccionados
+      genres: genreNames,
     });
   } catch (error) {
     return res.status(500).json({
@@ -288,7 +279,7 @@ export const updateGame = async (req, res) => {
     );
 
     const game = { ...rows[0] };
-    Object.keys(game).forEach(key =>
+    Object.keys(game).forEach((key) =>
       game[key] === null ? delete game[key] : key
     );
 

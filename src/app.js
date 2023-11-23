@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import gamesRoutes from "./games/games.routes.js";
 import { PORT } from "./config.js";
-// const PORT = 3000;
 
 const app = express();
 
