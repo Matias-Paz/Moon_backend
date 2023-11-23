@@ -15,7 +15,7 @@ CREATE TABLE company (
 
 CREATE TABLE games (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    img VARCHAR(255) DEFAULT 'image.webp',
+    img VARCHAR(255) DEFAULT 'default.webp',
     offer INT NOT NULL,
     price INT NOT NULL,
     stock INT NOT NULL,
