@@ -201,8 +201,12 @@ export const updateGameInDB = async (gameId, updateData, res) => {
       rating: !isNaN(Number(updateData.rating))
         ? Number(updateData.rating)
         : updateData.rating,
-      developer: Number(updateData.developer) || null,
-      publisher: Number(updateData.publisher) || null,
+      developer: !isNaN(Number(updateData.developer))
+        ? Number(updateData.developer)
+        : updateData.developer,
+      publisher: !isNaN(Number(updateData.publisher))
+        ? Number(updateData.publisher)
+        : updateData.publisher,
       short_description: updateData.short_description || null,
       release_date:
         updateData.release_date === undefined
