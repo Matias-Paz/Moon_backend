@@ -188,7 +188,7 @@ export const updateGameInDB = async (gameId, updateData, res) => {
   const resultValidation = gamesValidation(
     {
       title: updateData.title || null,
-      img: updateData.img || "default.webp",
+      img: updateData.img,
       offer: !isNaN(Number(updateData.offer))
         ? Number(updateData.offer)
         : updateData.offer,
