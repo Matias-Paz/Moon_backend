@@ -6,6 +6,7 @@ import {
   updateGame,
   deleteGame,
 } from "./games.controller.js";
+import { uploadFile } from "../utility/handleStorage.js";
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.get("/games", getGames);
 
 router.get("/games/:id", getGame);
 
-router.post("/games", createGame);
+router.post("/games", uploadFile.single("img"), createGame);
 
 router.patch("/games/:id", updateGame);
 

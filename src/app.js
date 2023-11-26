@@ -14,6 +14,8 @@ app.use(cors());
 
 app.disable("x-powered-by");
 
+app.use(express.static("public"));
+
 app.use(express.json());
 
 app.use("/api", gamesRoutes);
