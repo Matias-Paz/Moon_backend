@@ -7,7 +7,7 @@ export const getGames = async (req, res) => {
     const games = await gamesModel.getGamesFromDB();
     res.status(200).json(games);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message, error: error });
   }
 };
 
@@ -28,8 +28,7 @@ export const getGame = async (req, res) => {
 export const createGame = async (req, res) => {
   try {
     // Está creando una variedad de géneros únicos a partir de `req.body.genres`.
-    // Si `req.body.genres` es `undefined`, entonces `uniqueGenres` será un arreglo vacío.
-    const uniqueGenres = [...new Set(req.body.genres?.split(",") || "")];
+    const uniqueGenres = req.body.genres.filter(genre => !isNaN(Number(genre)));
 
     // Está validando los datos de entrada.
     const resultValidation = gamesValidation({
@@ -43,7 +42,7 @@ export const createGame = async (req, res) => {
       publisher: Number(req.body.publisher),
       release_date: new Date(req.body.release_date),
       short_description: req.body.short_description,
-      genres: uniqueGenres.map((genre) => Number(genre)),
+      genres: uniqueGenres.map(genre => Number(genre)),
     });
 
     // Si la validación falla, entonces se envía un mensaje de error.

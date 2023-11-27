@@ -64,7 +64,8 @@ INSERT INTO company (_name) VALUES
 ('Perfect World Entertainment'),
 ('Xbox Game Studios'),
 ('Targem'),
-('The Astronauts');
+('The Astronauts'),
+('Desconocido');
 
 
 -- Insertar el juego en la tabla games con los IDs obtenidos de los publishers y developers
