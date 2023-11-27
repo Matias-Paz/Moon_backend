@@ -7,7 +7,7 @@ export const getGames = async (req, res) => {
     const games = await gamesModel.getGamesFromDB();
     res.status(200).json(games);
   } catch (error) {
-    res.status(500).send("Internal Server Error");
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -18,10 +18,10 @@ export const getGame = async (req, res) => {
     if (game) {
       res.status(200).json(game);
     } else {
-      res.status(404).send("Game not found");
+      res.status(404).json({ message: "Game not found" });
     }
   } catch (error) {
-    res.status(500).send("Internal Server Error");
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -69,14 +69,26 @@ export const createGame = async (req, res) => {
 export const deleteGame = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await gamesModel.deleteGameInDB(id);
-    if (result) {
-      res.status(204).send();
-    } else {
-      res.status(404).send("Game not found");
+
+    const game = await gamesModel.getGameFromDB(id);
+
+    if (!game) {
+      return res.status(404).json({ message: "Game not found" });
     }
+
+    if (game.img !== "default.webp") {
+      deleteImage(`public/images/${game.img}`);
+    }
+
+    const deletedGame = await gamesModel.deleteGameInDB(id);
+
+    if (!deletedGame) {
+      return res.status(500).json({ message: "Error deleting game" });
+    }
+
+    return res.status(200).json({ message: "Game deleted successfully!" });
   } catch (error) {
-    res.status(500).send("Internal Server Error");
+    res.status(500).json({ message: error.message });
   }
 };
 
