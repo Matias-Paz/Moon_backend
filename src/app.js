@@ -9,7 +9,6 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}: http://localhost:${PORT}`);
 });
 
-// Configurar el middleware CORS para permitir cualquier origen
 app.use(cors());
 
 app.disable("x-powered-by");

@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
-export const deleteImage = async (filePath) => {
+export const deleteImage = async filePath => {
   try {
-    // Se elimina la imagen.
     await fs.unlink(filePath);
+    console.log(`File ${filePath} deleted successfully`);
   } catch (error) {
     console.error(`Error deleting file ${filePath}: ${error.message}`);
   }

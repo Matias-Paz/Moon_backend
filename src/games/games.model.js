@@ -157,7 +157,7 @@ export const deleteGameInDB = async gameId => {
   return result.affectedRows > 0;
 };
 
-export const updateGameInDB = async (gameId, updateData, res) => {
+export const updateGameInDB = async (gameId, updateData) => {
   const updatedGenres = updateData.genres || [];
 
   const resultValidation = gamesValidation(

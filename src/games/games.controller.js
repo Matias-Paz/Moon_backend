@@ -1,6 +1,7 @@
 import * as gamesModel from "./games.model.js";
 import { gamesValidation } from "./games.validation.js";
 import { deleteImage } from "../utility/deleteImage.js";
+const URL = process.env.PUBLIC_URL;
 
 export const getGames = async (req, res) => {
   try {
@@ -26,35 +27,37 @@ export const getGame = async (req, res) => {
 };
 
 export const createGame = async (req, res) => {
+  // Está creando una variedad de géneros únicos a partir de `req.body.genres`.
+  const uniqueGenres = req.body.genres.filter(genre => !isNaN(Number(genre)));
+
+  // Está validando los datos de entrada.
+
+  const imgFile =
+    req.file === undefined
+      ? "http://localhost:3000/default.webp"
+      : `${URL}/${req.file.filename}`;
+
+  const resultValidation = gamesValidation({
+    title: req.body.title,
+    img: imgFile || "default.webp",
+    offer: Number(req.body.offer),
+    price: Number(req.body.price),
+    stock: Number(req.body.stock),
+    rating: Number(0),
+    developer: Number(req.body.developer),
+    publisher: Number(req.body.publisher),
+    release_date: new Date(req.body.release_date),
+    short_description: req.body.short_description,
+    genres: uniqueGenres.map(genre => Number(genre)),
+  });
+
+  // Si la validación falla, entonces se envía un mensaje de error.
+  if (!resultValidation?.success) {
+    console.log(!resultValidation.error);
+    return res.status(422).json({ message: resultValidation?.error });
+  }
+
   try {
-    // Está creando una variedad de géneros únicos a partir de `req.body.genres`.
-    const uniqueGenres = req.body.genres.filter(genre => !isNaN(Number(genre)));
-
-    // Está validando los datos de entrada.
-    const resultValidation = gamesValidation({
-      title: req.body.title,
-      img: req.file?.filename || "default.webp",
-      offer: Number(req.body.offer),
-      price: Number(req.body.price),
-      stock: Number(req.body.stock),
-      rating: Number(0),
-      developer: Number(req.body.developer),
-      publisher: Number(req.body.publisher),
-      release_date: new Date(req.body.release_date),
-      short_description: req.body.short_description,
-      genres: uniqueGenres.map(genre => Number(genre)),
-    });
-
-    // Si la validación falla, entonces se envía un mensaje de error.
-    if (!resultValidation?.success) {
-      // Si se subió una imagen, entonces se elimina.
-      if (req.file) {
-        deleteImage(req.file.path);
-      }
-      // Se envía un mensaje del error.
-      return res.status(422).json({ message: resultValidation?.error });
-    }
-
     // Si la validación es exitosa, entonces se crea el juego en la base de datos.
     const newGame = await gamesModel.createGameInDB(resultValidation.data);
 
@@ -68,24 +71,21 @@ export const createGame = async (req, res) => {
 export const deleteGame = async (req, res) => {
   try {
     const { id } = req.params;
-
     const game = await gamesModel.getGameFromDB(id);
 
     if (!game) {
-      return res.status(404).json({ message: "Game not found" });
+      return res.status(422).json({ message: "Not valid ID" });
     }
-
-    if (game.img !== "default.webp") {
-      deleteImage(`public/images/${game.img}`);
-    }
-
     const deletedGame = await gamesModel.deleteGameInDB(id);
 
     if (!deletedGame) {
-      return res.status(500).json({ message: "Error deleting game" });
+      return res.status(404).json({ message: "Error deleting game" });
     }
-
-    return res.status(200).json({ message: "Game deleted successfully!" });
+    const fileName = game.img.split("http://localhost:3000/").pop();
+    if (fileName !== "default.webp") {
+      await deleteImage(`public/${fileName}`);
+    }
+    return res.status(204).json({ message: "Game deleted successfully!" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

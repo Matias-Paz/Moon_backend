@@ -1,21 +1,21 @@
-import multer from "multer";
 import { randomUUID } from "node:crypto";
-import { dirname, join, extname } from "node:path";
+import multer from "multer";
+//recreate __dirname for ES Modules
 import { fileURLToPath } from "node:url";
-
+import { dirname } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    /*     const pathStorage = `${__dirname}/../../public/images`;
-    cb(null, pathStorage); */
-    cb(null, join(__dirname, "../../", "public", "images"));
+    const pathStorage = `${__dirname}/../../public`;
+    cb(null, pathStorage);
   },
   filename: (req, file, cb) => {
-    const ext = extname(file.originalname);
+    const ext = file.originalname;
     const infix = randomUUID();
-    cb(null, "img-" + infix + ext);
+    const imgName = `img-${infix}${ext}`;
+    cb(null, imgName);
   },
 });
 
