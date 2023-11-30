@@ -1,7 +1,6 @@
 import * as gamesModel from "./games.model.js";
 import { gamesValidation } from "./games.validation.js";
 import { deleteImage } from "../utility/deleteImage.js";
-const URL = process.env.PUBLIC_URL;
 
 export const getGames = async (req, res) => {
   try {
@@ -27,19 +26,14 @@ export const getGame = async (req, res) => {
 };
 
 export const createGame = async (req, res) => {
-  // Está creando una variedad de géneros únicos a partir de `req.body.genres`.
-  const uniqueGenres = req.body.genres.filter(genre => !isNaN(Number(genre)));
+  const genresArray = Array.isArray(req.body.genres) ? req.body.genres : [];
 
-  // Está validando los datos de entrada.
-
-  const imgFile =
-    req.file === undefined
-      ? "http://localhost:3000/default.webp"
-      : `${URL}/${req.file.filename}`;
+  const uniqueGenres =
+    genresArray.filter((genre) => !isNaN(Number(genre))) || [];
 
   const resultValidation = gamesValidation({
     title: req.body.title,
-    img: imgFile || "default.webp",
+    img: req.file?.filename || "default.webp",
     offer: Number(req.body.offer),
     price: Number(req.body.price),
     stock: Number(req.body.stock),
@@ -48,12 +42,16 @@ export const createGame = async (req, res) => {
     publisher: Number(req.body.publisher),
     release_date: new Date(req.body.release_date),
     short_description: req.body.short_description,
-    genres: uniqueGenres.map(genre => Number(genre)),
+    genres: uniqueGenres.map((genre) => Number(genre)),
   });
 
   // Si la validación falla, entonces se envía un mensaje de error.
   if (!resultValidation?.success) {
-    console.log(!resultValidation.error);
+    // Si se subió una imagen, entonces se elimina.
+    if (req.file) {
+      deleteImage(req.file.path);
+    }
+    // Se envía un mensaje del error.
     return res.status(422).json({ message: resultValidation?.error });
   }
 
@@ -81,9 +79,9 @@ export const deleteGame = async (req, res) => {
     if (!deletedGame) {
       return res.status(404).json({ message: "Error deleting game" });
     }
-    const fileName = game.img.split("http://localhost:3000/").pop();
-    if (fileName !== "default.webp") {
-      await deleteImage(`public/${fileName}`);
+
+    if (game.img !== "default.webp") {
+      await deleteImage(`public/images/${game.img}`);
     }
     return res.status(204).json({ message: "Game deleted successfully!" });
   } catch (error) {

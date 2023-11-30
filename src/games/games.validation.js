@@ -11,7 +11,7 @@ const gameSchema = z.object({
   publisher: z.number().min(1).max(999),
   release_date: z.date(),
   short_description: z.string().min(1).max(255),
-  genres: z.array(z.number()).min(0).max(3),
+  genres: z.array(z.number()).min(1).max(3),
 });
 
 const gameSchemaNullable = z.object({
