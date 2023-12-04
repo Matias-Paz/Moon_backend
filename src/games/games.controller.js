@@ -4,7 +4,24 @@ import { deleteImage } from "../utility/deleteImage.js";
 
 export const getGames = async (req, res) => {
   try {
-    const games = await gamesModel.getGamesFromDB();
+    const {
+      genre,
+      min = 0,
+      max = 999999,
+      publisher,
+      developer,
+      sortOrder = "ASC",
+      searchTerm = "",
+    } = req.query;
+    const games = await gamesModel.getGamesFromDB(
+      genre,
+      min,
+      max,
+      publisher,
+      developer,
+      sortOrder,
+      searchTerm
+    );
     res.status(200).json(games);
   } catch (error) {
     res.status(500).json({ message: error.message, error: error });

@@ -2,19 +2,78 @@ import { pool } from "../db.js";
 import { gamesValidation } from "./games.validation.js";
 import { formatGames } from "../utility/gameFunction.js";
 
-export const getGamesFromDB = async () => {
+export const getGamesFromDB = async (
+  genre,
+  min,
+  max,
+  publisher,
+  developer,
+  sortOrder,
+  searchTerm
+) => {
+  let whereClause = "";
+  let params = [];
+
+  if (genre) {
+    whereClause += " AND ge._name = ?";
+    params.push(genre);
+  }
+
+  whereClause += " AND g.price >= ? AND g.price <= ?";
+  params.push(min, max);
+
+  if (publisher) {
+    whereClause += " AND c1._name = ?";
+    params.push(publisher);
+  }
+  if (developer) {
+    whereClause += " AND c1._name = ?";
+    params.push(developer);
+  }
+
+  if (searchTerm) {
+    whereClause += " AND g.title LIKE ?";
+    params.push(`%${searchTerm}%`);
+  }
+
   const [rows] = await pool.query(
-    "SELECT g.id, g.img, g.offer, g.price, g.stock, g.title, g.rating, g.release_date, g.short_description, c1._name AS publisher, c2._name AS developer, GROUP_CONCAT(DISTINCT ge._name) AS genres FROM games g JOIN company c1 ON g.publishers_id = c1.company_id JOIN company c2 ON g.developers_id = c2.company_id LEFT JOIN games_genres gg ON g.id = gg.games_id LEFT JOIN genres ge ON gg.genres_id = ge.genres_id GROUP BY g.id;"
+    `
+    SELECT
+      g.id,
+      g.img,
+      g.offer,
+      g.price,
+      g.stock,
+      g.title,
+      g.rating,
+      g.release_date,
+      g.short_description,
+      c1._name AS publisher,
+      c2._name AS developer,
+      GROUP_CONCAT(DISTINCT ge._name) AS genres
+    FROM
+      games g
+      JOIN company c1 ON g.publishers_id = c1.company_id
+      JOIN company c2 ON g.developers_id = c2.company_id
+      LEFT JOIN games_genres gg ON g.id = gg.games_id
+      LEFT JOIN genres ge ON gg.genres_id = ge.genres_id
+    WHERE 1 = 1 ${whereClause}
+    GROUP BY
+      g.id
+    ORDER BY
+      g.price ${sortOrder};
+  `,
+    params
   );
 
-  const formattedRows = rows.map(row => {
+  const formattedRows = rows.map((row) => {
     return formatGames(row);
   });
 
   return formattedRows;
 };
 
-export const getGameFromDB = async gameId => {
+export const getGameFromDB = async (gameId) => {
   const [rows] = await pool.query(
     "SELECT g.id, g.img, g.offer, g.price, g.stock, g.title, g.rating, g.release_date, g.short_description, c1._name AS publisher, c2._name AS developer, GROUP_CONCAT(DISTINCT ge._name) AS genres FROM games g JOIN company c1 ON g.publishers_id = c1.company_id JOIN company c2 ON g.developers_id = c2.company_id LEFT JOIN games_genres gg ON g.id = gg.games_id LEFT JOIN genres ge ON gg.genres_id = ge.genres_id WHERE g.id = ? GROUP BY g.id;",
     [gameId]
@@ -23,7 +82,7 @@ export const getGameFromDB = async gameId => {
   return rows.length > 0 ? formatGames(rows[0]) : null;
 };
 
-export const getGenresDataFromDB = async usedGenres => {
+export const getGenresDataFromDB = async (usedGenres) => {
   if (usedGenres.size > 0) {
     const genresData = await pool.query(
       "SELECT _name FROM genres WHERE genres_id IN (?)",
@@ -68,7 +127,7 @@ export const createGameInDB = async ({
     }
 
     // Comprobando si los géneros existen en la base de datos
-    const genreCheckPromises = genres.map(genreId =>
+    const genreCheckPromises = genres.map((genreId) =>
       checkEntityExistsInDB("games_genres", "genres_id", genreId)
     );
 
@@ -76,7 +135,7 @@ export const createGameInDB = async ({
     const genreExistsResults = await Promise.all(genreCheckPromises);
 
     // Si alguno de los géneros no existe, entonces se envía un mensaje de error
-    if (genreExistsResults.some(exists => !exists)) {
+    if (genreExistsResults.some((exists) => !exists)) {
       throw { status: 404, message: "One or more genres not found." };
     }
 
@@ -147,7 +206,7 @@ export const createGameInDB = async ({
   }
 };
 
-export const deleteGameInDB = async gameId => {
+export const deleteGameInDB = async (gameId) => {
   // Delete associations of the game in the games_genres table
   await pool.query("DELETE FROM games_genres WHERE games_id = ?", [gameId]);
 
@@ -187,7 +246,7 @@ export const updateGameInDB = async (gameId, updateData) => {
         updateData.release_date === undefined
           ? null
           : new Date(updateData.release_date),
-      genres: updatedGenres.map(genre =>
+      genres: updatedGenres.map((genre) =>
         !isNaN(Number(genre)) ? Number(genre) : genre
       ),
     },
@@ -199,7 +258,7 @@ export const updateGameInDB = async (gameId, updateData) => {
   }
   // Verificar si el publisher existe
   const genresExist = await Promise.all(
-    updatedGenres.map(genreId =>
+    updatedGenres.map((genreId) =>
       checkEntityExistsInDB("genres", "genres_id", genreId)
     )
   );
@@ -276,7 +335,7 @@ export const updateGameInDB = async (gameId, updateData) => {
     );
 
     const game = { ...rows[0] };
-    Object.keys(game).forEach(key =>
+    Object.keys(game).forEach((key) =>
       game[key] === null ? delete game[key] : key
     );
     const formattedRow = formatGames(game);
