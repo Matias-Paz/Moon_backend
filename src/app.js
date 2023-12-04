@@ -9,7 +9,7 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}: http://localhost:${PORT}`);
 });
 
-app.use(cors());
+app.use(cors("*"));
 
 app.disable("x-powered-by");
 

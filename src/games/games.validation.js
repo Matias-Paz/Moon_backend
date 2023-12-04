@@ -20,12 +20,11 @@ const gameSchemaNullable = z.object({
   price: z.number().min(1).max(999999).optional(),
   stock: z.number().min(0).max(255).optional(),
   title: z.string().min(1).max(255).nullable().optional(),
-  rating: z.number().min(0).max(5).optional(),
   developer: z.number().min(1).max(999).optional(),
   publisher: z.number().min(1).max(999).optional(),
   short_description: z.string().min(1).max(255).nullable().optional(),
   release_date: z.date().nullable().optional(),
-  genres: z.array(z.number()).min(0).max(3).optional(),
+  genres: z.array(z.number()).min(1).max(3).optional(),
 });
 
 export function gamesValidation(object, nullable = false) {
