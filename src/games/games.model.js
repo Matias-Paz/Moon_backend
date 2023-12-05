@@ -269,7 +269,7 @@ export const updateGameInDB = async (gameId, updateData) => {
     const gameData = { ...updateData };
     const currentGenre = {};
 
-    if (gameData?.developer) {
+    if (gameData.developer) {
       // Comprobando si el desarrollador existe en la base de datos
       const [developerResult] = await existCompanyId(gameData.developer);
 
@@ -283,7 +283,7 @@ export const updateGameInDB = async (gameId, updateData) => {
       gameData.developers_id = developerResult.company_id;
     }
 
-    if (gameData?.publisher) {
+    if (gameData.publisher) {
       // Comprobando si el editor existe en la base de datos
       const [publisherResult] = await existCompanyId(gameData.publisher);
 
@@ -300,7 +300,7 @@ export const updateGameInDB = async (gameId, updateData) => {
     // Seteamos el valor de result a false para que no se actualice el juego
     let result = false;
 
-    if (gameData?.genres) {
+    if (gameData.genres) {
       // Comprobando si los géneros existen en la base de datos
       const GenresResult = await existGenreId(gameData.genres);
 
