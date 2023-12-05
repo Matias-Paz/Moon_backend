@@ -42,6 +42,7 @@ export const getGamesFromDB = async (
       g.img,
       g.offer,
       g.price,
+      (g.price - (g.price * g.offer / 100)) AS discounted_price,
       g.stock,
       g.title,
       g.rating,
@@ -60,12 +61,13 @@ export const getGamesFromDB = async (
     GROUP BY
       g.id
     ORDER BY
-      g.price ${sortOrder};
+      (g.price - (g.price * g.offer / 100)) ${sortOrder};
   `,
     params
   );
 
   const formattedRows = rows.map((row) => {
+    row.discounted_price = Math.round(row.discounted_price);
     return formatGames(row);
   });
 
