@@ -95,7 +95,7 @@ export const getGameIdFromDB = async (gameId) => {
   const query = `
   SELECT 
     g.img, g.offer, g.price, g.stock, g.title, g.release_date, g.short_description, 
-    c1.company_id AS publisher_id, c2.company_id AS developer_id, 
+    c1.company_id AS publisher, c2.company_id AS developer, 
     GROUP_CONCAT(ge.genres_id) AS genres
   FROM 
     games g 
@@ -113,7 +113,15 @@ export const getGameIdFromDB = async (gameId) => {
 
   const game = {
     ...rows[0],
-    genres: rows[0]?.genres ? rows[0].genres.split(",").map(Number) : undefined,
+    offer: rows[0]?.offer ? String(rows[0].offer) : undefined,
+    price: rows[0]?.price ? String(rows[0].price) : undefined,
+    stock: rows[0]?.stock ? String(rows[0].stock) : undefined,
+    publisher: rows[0]?.publisher ? String(rows[0].publisher) : undefined,
+    developer: rows[0]?.developer ? String(rows[0].developer) : undefined,
+    genres: rows[0]?.genres ? rows[0].genres.split(",") : undefined,
+    release_date: rows[0]?.release_date
+      ? rows[0].release_date.toISOString().split("T")[0]
+      : undefined,
   };
 
   return game || null;
@@ -254,176 +262,174 @@ export const deleteGameInDB = async (gameId) => {
 };
 
 export const updateGameInDB = async (gameId, updateData) => {
-  const updatedGenres = updateData.genres || [];
-
-  const resultValidation = gamesValidation(
-    {
-      title: updateData.title || null,
-      img: updateData.img,
-      offer: !isNaN(Number(updateData.offer))
-        ? Number(updateData.offer)
-        : updateData.offer,
-      price: !isNaN(Number(updateData.price))
-        ? Number(updateData.price)
-        : updateData.price,
-      stock: !isNaN(Number(updateData.stock))
-        ? Number(updateData.stock)
-        : updateData.stock,
-      rating: !isNaN(Number(updateData.rating))
-        ? Number(updateData.rating)
-        : updateData.rating,
-      developer: !isNaN(Number(updateData.developer))
-        ? Number(updateData.developer)
-        : updateData.developer,
-      publisher: !isNaN(Number(updateData.publisher))
-        ? Number(updateData.publisher)
-        : updateData.publisher,
-      short_description: updateData.short_description || null,
-      release_date:
-        updateData.release_date === undefined
-          ? null
-          : new Date(updateData.release_date),
-      genres: updatedGenres.map((genre) =>
-        !isNaN(Number(genre)) ? Number(genre) : genre
-      ),
-    },
-    true
-  );
-
-  if (!resultValidation?.success) {
-    throw { status: 422, message: JSON.parse(resultValidation?.error) };
-  }
-  // Verificar si el publisher existe
-  const genresExist = await Promise.all(
-    updatedGenres.map((genreId) =>
-      checkEntityExistsInDB("genres", "genres_id", genreId)
-    )
-  );
-
-  if (genresExist.includes(false)) {
-    throw { status: 404, message: "Developer or publisher not found." };
-  }
-
   try {
-    const updateFields = [];
-    const setValues = [];
+    const id = Number(gameId);
+    const gameData = { ...updateData };
+    const currentGenre = {};
 
-    // Iterar sobre las propiedades de updateData
-    for (const field in updateData) {
-      if (field === "release_date") {
-        updateFields.push(`${field} = ?`);
-        setValues.push(
-          updateData[field] === null ? null : new Date(updateData[field])
-        );
-      } else if (field === "developer") {
-        const developerExists = await checkEntityExistsInDB(
-          "company",
-          "company_id",
-          updateData.developer
-        );
-        if (!developerExists) {
-          throw { status: 404, message: "Developer not found." };
-        }
-        updateFields.push(`developers_id = ?`);
-        setValues.push(updateData[field] === null ? null : updateData[field]);
-      } else if (field === "publisher") {
-        const publisherExists = await checkEntityExistsInDB(
-          "company",
-          "company_id",
-          updateData.publisher
-        );
-        if (!publisherExists) {
-          throw { status: 404, message: "Publisher not found." };
-        }
-        updateFields.push(`publishers_id = ?`);
-        setValues.push(updateData[field] === null ? null : updateData[field]);
-      } else if (field !== "genres") {
-        // Agregar campo a las listas de actualización (excepto "genres")
-        updateFields.push(`${field} = ?`);
-        setValues.push(updateData[field] === null ? null : updateData[field]);
+    if (gameData?.developer) {
+      // Comprobando si el desarrollador existe en la base de datos
+      const [developerResult] = await existCompanyId(gameData.developer);
+
+      if (developerResult.length === 0) {
+        throw { status: 404, message: "Developer not found." };
+      }
+
+      delete gameData.developer;
+
+      // Insertar el juego en gamesData para actualizarlo en la base de datos
+      gameData.developers_id = developerResult.company_id;
+    }
+
+    if (gameData?.publisher) {
+      // Comprobando si el editor existe en la base de datos
+      const [publisherResult] = await existCompanyId(gameData.publisher);
+
+      if (publisherResult.length === 0) {
+        throw { status: 404, message: "Publisher not found." };
+      }
+
+      delete gameData.publisher;
+
+      // Insertar el juego en gamesData para actualizarlo en la base de datos
+      gameData.publishers_id = publisherResult.company_id;
+    }
+
+    if (gameData?.genres) {
+      // Comprobando si los géneros existen en la base de datos
+      const GenresResult = await existGenreId(gameData.genres);
+
+      if (GenresResult && GenresResult.length === 0) {
+        throw { status: 404, message: "Genres not found." };
+      }
+
+      // Insertar el juego en curentGenre para actualizarlo en la base de datos
+      currentGenre.genres = GenresResult.map((genre) => genre.genres_id);
+
+      delete gameData.genres;
+
+      // borrando las asociaciones de géneros en la base de datos
+      await deleteGames_Genres(id);
+
+      // Insertar las asociaciones de géneros en la base de datos
+      for (const genreId of currentGenre.genres) {
+        await addGames_Genres(id, genreId);
       }
     }
 
-    // Actualizar la base de datos si hay campos para actualizar
-    if (updateFields.length > 0) {
-      const updateQuery = `UPDATE games SET ${updateFields.join(
-        ", "
-      )} WHERE id = ?`;
-      await pool.query(updateQuery, [...setValues, gameId]);
+    let result = false;
+
+    if (Object.keys(gameData).length > 0) {
+      const updateQuery = `
+      UPDATE games
+      SET ${Object.keys(gameData)
+        .map((key) => `${key} = ?`)
+        .join(", ")}
+      WHERE id = ?
+      `;
+
+      const updateValues = [...Object.values(gameData), id];
+
+      result = await pool.query(updateQuery, updateValues);
     }
 
-    // Manejar las asociaciones de géneros
-    if (updatedGenres.length > 0) {
-      // Eliminar asociaciones de géneros existentes
-      await pool.query("DELETE FROM games_genres WHERE games_id = ?", [gameId]);
-
-      // Insertar nuevas asociaciones de géneros
-      for (const genreId of updatedGenres) {
-        await pool.query(
-          "INSERT INTO games_genres (games_id, genres_id) VALUES (?, ?)",
-          [gameId, genreId]
-        );
-      }
-    }
-
-    const [rows] = await pool.query(
-      "SELECT g.id, g.img, g.offer, g.price, g.stock, g.title, g.rating, g.release_date, g.short_description, c1._name AS publisher, c2._name AS developer, GROUP_CONCAT(DISTINCT ge._name) AS genres FROM games g JOIN company c1 ON g.publishers_id = c1.company_id JOIN company c2 ON g.developers_id = c2.company_id LEFT JOIN games_genres gg ON g.id = gg.games_id LEFT JOIN genres ge ON gg.genres_id = ge.genres_id WHERE g.id = ? GROUP BY g.id;",
-      [gameId]
-    );
-
-    const game = { ...rows[0] };
-    Object.keys(game).forEach((key) =>
-      game[key] === null ? delete game[key] : key
-    );
-    const formattedRow = formatGames(game);
-    return formattedRow;
+    return result;
   } catch (error) {
-    // Handle the duplicate genre entry error
-    if (error.code === "ER_DUP_ENTRY") {
-      throw {
-        status: 400,
-        message: "Duplicate genre IDs are not allowed.",
-      };
-    }
-
-    if (error.code === "ER_BAD_NULL_ERROR") {
-      throw {
-        status: 400,
-        message: "Attempted to send a null value in some field.",
-      };
-    }
-
-    throw {
-      status: error.status || 500,
-      message: error.message || "Something went wrong",
-      error: error.toString(),
-    };
+    throw { status: 500, message: error.message, error: error };
   }
 };
 
 export const checkEntityExistsInDB = async (tableName, idColumn, entityId) => {
-  const [result] = await pool.query(
-    `SELECT COUNT(*) as count FROM ${tableName} WHERE ${idColumn} = ?`,
-    [entityId]
-  );
-  return result[0].count > 0;
+  try {
+    const [result] = await pool.query(
+      `SELECT COUNT(*) as count FROM ${tableName} WHERE ${idColumn} = ?`,
+      [entityId]
+    );
+
+    return result[0].count > 0;
+  } catch (error) {
+    throw { status: 500, message: error.message, error: error };
+  }
 };
 
-export const existGenreInDB = async (genresName) => {
-  const placeholders = genresName.map(() => "?").join(",");
+export const existGenreName = async (genresName) => {
+  try {
+    const placeholders = genresName.map(() => "?").join(",");
 
-  const [result] = await pool.query(
-    `SELECT * FROM genres WHERE _name IN (${placeholders});`,
-    [...genresName]
-  );
+    const [result] = await pool.query(
+      `SELECT * FROM genres WHERE _name IN (${placeholders});`,
+      [...genresName]
+    );
 
-  return result;
+    return result;
+  } catch (error) {
+    throw { status: 500, message: error.message, error: error };
+  }
+};
+
+export const existGenreId = async (genresId) => {
+  try {
+    const placeholders = genresId.map(() => "?").join(",");
+
+    const [result] = await pool.query(
+      `SELECT * FROM genres WHERE genres_id IN (${placeholders});`,
+      [...genresId]
+    );
+
+    return result;
+  } catch (error) {
+    throw { status: 500, message: error.message, error: error };
+  }
+};
+
+export const addGames_Genres = async (gamesId, genresId) => {
+  try {
+    const [result] = await pool.query(
+      "INSERT INTO games_genres (games_id, genres_id) VALUES (?, ?);",
+      [gamesId, genresId]
+    );
+
+    return result;
+  } catch (error) {
+    throw { status: 500, message: error.message, error: error };
+  }
+};
+
+export const deleteGames_Genres = async (gamesId) => {
+  try {
+    const [result] = await pool.query(
+      "DELETE FROM games_genres WHERE games_id = ?;",
+      [gamesId]
+    );
+
+    return result;
+  } catch (error) {
+    throw { status: 500, message: error.message, error: error };
+  }
 };
 
 export const existCompanyInDB = async (companyName) => {
-  const [result] = await pool.query(`SELECT * FROM company WHERE _name = ?;`, [
-    companyName,
-  ]);
+  try {
+    const [result] = await pool.query(
+      "SELECT * FROM company WHERE _name = ?;",
+      [companyName]
+    );
 
-  return result;
+    return result;
+  } catch (error) {
+    throw { status: 500, message: error.message, error: error };
+  }
+};
+
+export const existCompanyId = async (companyId) => {
+  try {
+    const [result] = await pool.query(
+      "SELECT * FROM company WHERE company_id = ?;",
+      [companyId]
+    );
+
+    return result;
+  } catch (error) {
+    throw { status: 500, message: error.message, error: error };
+  }
 };

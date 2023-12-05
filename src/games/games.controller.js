@@ -1,6 +1,7 @@
 import * as gamesModel from "./games.model.js";
-import { gamesValidation } from "./games.validation.js";
+import { Validation } from "./gamesVa.js";
 import { deleteImage } from "../utility/deleteImage.js";
+import { arraysAreEqual } from "../utility/gameFunction.js";
 
 export const getGames = async (req, res) => {
   try {
@@ -76,13 +77,12 @@ export const getGameId = async (req, res) => {
 
 export const createGame = async (req, res) => {
   try {
-    console.log("req.body", req.body);
     const genresArray = Array.isArray(req.body.genres) ? req.body.genres : [];
 
     const uniqueGenres =
       genresArray.filter((genre) => !isNaN(Number(genre))) || [];
 
-    const resultValidation = gamesValidation({
+    const resultValidation = Validation.creationValidation({
       title: req.body.title,
       img: req.file?.filename || "default.webp",
       offer: Number(req.body.offer),
@@ -144,82 +144,60 @@ export const deleteGame = async (req, res) => {
 
 export const updateGame = async (req, res) => {
   try {
-    console.log("req.body.img", req.file);
-    console.log("req.body.offer", req.body.offer);
-    console.log("req.body.price", req.body.price);
-    console.log("req.body.stock", req.body.stock);
-    console.log("req.body.developer", req.body.developer);
-    console.log("req.body.publisher", req.body.publisher);
-
-    const genres = req.body.genres?.split(",");
+    let genres;
+    if (req.body.genres) {
+      genres = req.body.genres.split(",");
+    }
 
     const reqGame = {
-      title: req.body?.title || null,
+      title: req.body.title || null,
       img: req.file?.filename || null,
-      offer: req.body?.offer ? Number(req.body.offer) : null,
-      price: req.body?.price ? Number(req.body.price) : null,
-      stock: req.body?.stock ? Number(req.body.stock) : null,
-      developer: req.body?.developer || null,
-      publisher: req.body?.publisher || null,
-      short_description: req.body?.short_description || null,
-      release_date: req.body?.release_date
-        ? new Date(req.body.release_date)
-        : null,
-      genres: Array.isArray(genres) ? genres.map((genre) => genre) : null,
+      offer: req.body.offer ? Number(req.body.offer) : null,
+      price: req.body.price ? Number(req.body.price) : null,
+      stock: req.body.stock ? Number(req.body.stock) : null,
+      developer: req.body.developer ? Number(req.body.developer) : null,
+      publisher: req.body.publisher ? Number(req.body.publisher) : null,
+      short_description: req.body.short_description || null,
+      release_date: req.body.release_date || null,
+      genres: Array.isArray(genres) ? genres.map(Number) : null,
     };
 
-    console.log("reqGame", reqGame);
+    const id = Number(req.params.id);
 
-    return res.status(200).json({ message: "Game updated successfully!" });
+    const game = await gamesModel.getGameIdFromDB(id);
 
-    let developerId = null;
-
-    if (reqGame.developer) {
-      const existDeveloper = await gamesModel.existCompanyInDB(
-        reqGame.developer
-      );
-      if (!existDeveloper.length > 0) {
-        return res.status(404).json({ message: "Developer not found" });
-      }
-      developerId = existDeveloper[0].company_id;
+    if (!game) {
+      return res.status(422).json({ message: "Not valid ID" });
     }
 
-    let publisherId = null;
+    game.offer = Number(game.offer);
+    game.price = Number(game.price);
+    game.stock = Number(game.stock);
+    game.publisher = Number(game.publisher);
+    game.developer = Number(game.developer);
+    game.genres = game.genres.map(Number);
 
-    if (reqGame.publisher) {
-      const existDeveloper = await gamesModel.existCompanyInDB(
-        reqGame.publisher
-      );
-      if (!existDeveloper.length > 0) {
-        return res.status(404).json({ message: "Developer not found" });
-      }
-      publisherId = existDeveloper[0].company_id;
-    }
-
-    let genresId = null;
-
-    if (reqGame.genres) {
-      const existGenre = await gamesModel.existGenreInDB(reqGame.genres);
-      if (!existGenre.length > 0) {
-        return res.status(404).json({ message: "Genre not found" });
-      }
-      genresId = existGenre.map((item) => item.genres_id);
-    }
-
-    const newGame = {
-      ...reqGame,
-      developer: developerId,
-      publisher: publisherId,
-      genres: genresId,
-    };
-
-    const cleanedGame = Object.fromEntries(
-      Object.entries(newGame).filter(([key, value]) => value !== null)
+    // Se filtran los valores que son iguales, nulos o indefinidos.
+    const clearEntries = Object.fromEntries(
+      Object.entries(reqGame).filter(([key, value]) => {
+        // No se guardan los valores que son iguales, nulos o indefinidos.
+        if (Array.isArray(value) && Array.isArray(game[key])) {
+          return !arraysAreEqual(value, game[key]);
+        } else {
+          return game[key] !== value && value !== null && value !== undefined;
+        }
+      })
     );
 
-    console.log("cleanedGame", cleanedGame);
+    // Si no hay valores para actualizar, entonces se envía un mensaje de error.
+    if (Object.keys(clearEntries).length === 0) {
+      return res.status(422).json({ message: "No values to update." });
+    }
+    if (clearEntries.release_date) {
+      clearEntries.release_date = new Date(req.body.release_date);
+    }
 
-    const resultValidation = gamesValidation(cleanedGame, true);
+    const resultValidation = Validation.updateValidation(clearEntries);
 
     // Si la validación falla, entonces se envía un mensaje de error.
     if (!resultValidation?.success) {
@@ -231,24 +209,24 @@ export const updateGame = async (req, res) => {
       return res.status(422).json({ message: resultValidation?.error });
     }
 
-    return res.status(200).json({ message: "Game updated successfully!" });
-
-    // Verificar si el publisher existe
-    const genresExist = await Promise.all(
-      updatedGenres.map((genreId) =>
-        checkEntityExistsInDB("genres", "genres_id", genreId)
-      )
+    // Si la validación es exitosa, entonces se actualiza el juego en la base de datos.
+    const updatedGame = await gamesModel.updateGameInDB(
+      id,
+      resultValidation.data
     );
 
-    if (genresExist.includes(false)) {
-      throw { status: 404, message: "Developer or publisher not found." };
+    // Si no se actualizó ningún juego, entonces se envía un mensaje de error.
+    if (!updatedGame) {
+      // Si se subió una imagen, entonces se elimina.
+      if (req.file) {
+        deleteImage(req.file.path);
+      }
+      // Se envía un mensaje del error.
+      return res.status(404).json({ message: "Game not found." });
     }
 
-    const updateData = req.body;
-
-    res
-      .status(200)
-      .json({ message: "Game updated successfully!", updatedGame: newGame });
+    // Se envía un mensaje de éxito.
+    return res.status(200).json({ message: "Game updated successfully!" });
   } catch (error) {
     if (req.file) {
       deleteImage(req.file.path);
