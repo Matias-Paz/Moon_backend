@@ -297,6 +297,9 @@ export const updateGameInDB = async (gameId, updateData) => {
       gameData.publishers_id = publisherResult.company_id;
     }
 
+    // Seteamos el valor de result a false para que no se actualice el juego
+    let result = false;
+
     if (gameData?.genres) {
       // Comprobando si los géneros existen en la base de datos
       const GenresResult = await existGenreId(gameData.genres);
@@ -315,11 +318,10 @@ export const updateGameInDB = async (gameId, updateData) => {
 
       // Insertar las asociaciones de géneros en la base de datos
       for (const genreId of currentGenre.genres) {
-        await addGames_Genres(id, genreId);
+        // Le damos un valor a result para indicar que se actualizó el juego
+        result = await addGames_Genres(id, genreId);
       }
     }
-
-    let result = false;
 
     if (Object.keys(gameData).length > 0) {
       const updateQuery = `
@@ -332,6 +334,7 @@ export const updateGameInDB = async (gameId, updateData) => {
 
       const updateValues = [...Object.values(gameData), id];
 
+      // Le damos un valor a result para indicar que se actualizó el juego
       result = await pool.query(updateQuery, updateValues);
     }
 
