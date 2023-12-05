@@ -66,6 +66,8 @@ export const getGamesFromDB = async (
     params
   );
 
+  return rows;
+
   const formattedRows = rows.map((row) => {
     row.discounted_price = Math.round(row.discounted_price);
     return formatGames(row);

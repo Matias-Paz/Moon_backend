@@ -14,6 +14,7 @@ export const getGames = async (req, res) => {
       sortOrder = "ASC",
       searchTerm = "",
     } = req.query;
+
     const games = await gamesModel.getGamesFromDB(
       genre,
       min,
@@ -23,6 +24,11 @@ export const getGames = async (req, res) => {
       sortOrder,
       searchTerm
     );
+
+    if (games.length === 0) {
+      return res.status(404).json({ message: "Games not found" });
+    }
+
     res.status(200).json(games);
   } catch (error) {
     res.status(500).json({ message: error.message, error: error });
